@@ -16,17 +16,18 @@ contract Token {
     event Approve(address indexed owner, address indexed spender, uint256 amount);
 
     modifier whiteListCheck() {
-        require(whiteLists[msg.sender], "You aren't in whiteList");
+        require(whiteLists[msg.sender], "Token: You doesn't in whiteList");
         _;
     }
 
     modifier onlyOwner() {
-        require(contractOwner != msg.sender, "You aren't owner");
+        require(contractOwner == msg.sender, "Token: You aren't owner");
         _;
     }
 
     constructor(){
         contractOwner = msg.sender;
+        whiteLists[msg.sender] = true;
         name = "Dram";
         symbol = "AMD";
         totalSupply = 1000000;
@@ -61,15 +62,15 @@ contract Token {
         return whiteLists[owner];
     }
 
-    function approve (address spender, uint256 amount) public returns(bool){
-        require(balances[msg.sender] >= amount,"not enough funds");
+    function approve (address spender, uint256 amount) public onlyOwner returns(bool){
+        require(balances[msg.sender] >= amount,"Token: Not enough funds");
         allowances[msg.sender][spender] += amount;
         emit Approve(msg.sender, spender, amount);
         return true;
     }
 
     function transfer (address to, uint256 amount) public whiteListCheck returns(bool){
-        require(balances[msg.sender] >= amount, "Not enough funds");
+        require(balances[msg.sender] >= amount, "Token: Not enough funds");
         balances[msg.sender] -= amount;
         balances[to] += amount;
         emit Transfer(msg.sender, to, amount);
@@ -77,12 +78,13 @@ contract Token {
     }
 
     function transferFrom (address from, address to, uint256 amount) public whiteListCheck returns(bool){
-        require(allowances[from][to] >= amount, "Not enough allowance");
-        transfer(to, amount);
-        allowances[from][to] -= amount;
+        require(allowances[from][msg.sender] >= amount, "Token: Not enough allowance");
+        balances[from] -= amount;
+        balances[to] += amount;
+        allowances[from][msg.sender] -= amount;
+        emit Transfer(from, to, amount);
         return true;
     }
-
 
     function mint (address to, uint256 amount) public onlyOwner{
         totalSupply += amount;
@@ -90,7 +92,7 @@ contract Token {
     }
 
     function burn (address from, uint256 amount) public onlyOwner {
-        require(balances[from] >= amount, "Not enough funds");
+        require(balances[from] >= amount, "Token: Not enough funds");
         balances[from] -= amount;
         totalSupply -= amount;
     }
@@ -101,21 +103,21 @@ contract Token {
     }
 
     function _burn (address from, uint256 amount) internal {
-        require(balances[from] >= amount, "Not enough funds");
+        require(balances[from] >= amount, "Token: Not enough funds");
         balances[from] -= amount;
         totalSupply -= amount;
     }
 
     function buy () public payable {
-        _mint(msg.sender, msg.value);
+        _burn(msg.sender, msg.value);
     }
 
     function sell (uint256 amount) public {
-        _burn(msg.sender, amount);
+        _mint(msg.sender, amount);
         payable(msg.sender).transfer(amount);
     }
 
-    function editWhiteList (address spender) public returns(bool){
+    function editWhiteList (address spender) public onlyOwner returns(bool){
         whiteLists[spender] = !whiteLists[spender];
         return true;
     }
